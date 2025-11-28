@@ -20,6 +20,14 @@
     <!--  Main wrapper -->
     <div class="body-wrapper">
       <div class="container-fluid">
+      
+        <!-- [QUAN TRỌNG] ĐOẠN CODE HIỂN THỊ THÔNG BÁO CHÀO MỪNG -->
+        <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <span th:text="${successMessage}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        <!-- KẾT THÚC ĐOẠN CODE HIỂN THỊ THÔNG BÁO -->
+
         <!-- Row 1 -->
         <div class="row">
           <div class="col-lg-8 d-flex align-items-strech">

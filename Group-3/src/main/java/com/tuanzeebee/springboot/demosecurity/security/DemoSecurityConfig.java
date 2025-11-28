@@ -1,6 +1,5 @@
 package com.tuanzeebee.springboot.demosecurity.security;
 
-import com.tuanzeebee.springboot.demosecurity.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,7 +7,6 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
 @Configuration
 public class DemoSecurityConfig {
@@ -23,13 +21,11 @@ public class DemoSecurityConfig {
         this.customAuthenticationSuccessHandler = customAuthenticationSuccessHandler;
     }
 
-    // bcrypt bean definition
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // authenticationProvider bean definition
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider auth = new DaoAuthenticationProvider();
@@ -46,7 +42,7 @@ public class DemoSecurityConfig {
                                 .requestMatchers("/").hasRole("USER")
                                 .requestMatchers("/manager/**").hasRole("MANAGER")
                                 .requestMatchers("/admin/**").hasRole("ADMIN")
-                                .requestMatchers("assets/css/**", "assets/js/**", "assets/images/**","assets/libs","assets/libs").permitAll()
+                                .requestMatchers("/assets/css/**", "/assets/js/**", "/assets/images/**", "/assets/libs/**").permitAll()
                                 .requestMatchers("/register/**").permitAll()
                                 .requestMatchers("/requirement-food","/").permitAll()
                                 .requestMatchers("/blog","/").permitAll()
@@ -74,7 +70,8 @@ public class DemoSecurityConfig {
             )
             .exceptionHandling(configurer ->
                 configurer
-                    .accessDeniedPage("/error/access-denied")
+                    // SỬA Ở ĐÂY: Đổi từ "/error/access-denied" thành "/access-denied"
+                    .accessDeniedPage("/access-denied")
             )
             .csrf(csrf -> csrf
                 .ignoringRequestMatchers("/api/**", "/python/**")

@@ -42,9 +42,13 @@
           <div class="card">
             <div class="card-body">
               <h5 class="card-title fw-semibold mb-4">User Management</h5>
-              <div th:if="${message}" th:class="'alert ' + ${message.type}" role="alert">
+              
+              <!-- KHUNG HIỂN THỊ THÔNG BÁO TỪ CONTROLLER -->
+              <div th:if="${message}" th:class="'alert ' + ${message.type} + ' alert-dismissible fade show'" role="alert">
                 <span th:text="${message.content}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                </div>
+               
               <!-- Main User List View -->
               <div id="userListView">
                 <!-- Add User Button -->
@@ -72,7 +76,8 @@
                         <td th:text="${user.firstName + ' ' + user.lastName}"></td>
                         <td th:text="${user.email}"></td>
                         <td>
-                          <span th:each="role, iterStat : ${user.roles}" class="badge bg-primary me-1" 
+                          <!-- ĐÃ SỬA LỖI 500: Dùng ${role} vì user trả về DTO chứa mảng String -->
+                          <span th:each="role : ${user.roles}" class="badge bg-primary me-1" 
                                 th:text="${role}"></span>
                         </td>
                         <td>
@@ -94,30 +99,37 @@
               <!-- Add User Form -->
               <div id="addUserFormView" style="display: none;">
                 <h6 class="fw-semibold mb-3">Add New User</h6>
-                <form id="addUserForm" th:action="@{/admin/users/add}" method="post" th:object="${newUser}">
+                
+                <!-- QUAN TRỌNG: Thêm novalidate để tắt kiểm tra mặc định của trình duyệt -->
+                <form id="addUserForm" th:action="@{/admin/users/add}" method="post" th:object="${newUser}" novalidate>
                   <div class="row mb-3">
                     <div class="col-md-6">
                       <label class="form-label">Username</label>
-                      <input type="text" class="form-control" name="username" required>
+                      <!-- ĐÃ XÓA required -->
+                      <input type="text" class="form-control" name="username" th:field="*{username}">
                     </div>
                     <div class="col-md-6">
                       <label class="form-label">Password</label>
-                      <input type="password" class="form-control" name="password" required>
+                      <!-- ĐÃ XÓA required -->
+                      <input type="password" class="form-control" name="password" th:field="*{password}">
                     </div>
                   </div>
                   <div class="row mb-3">
                     <div class="col-md-6">
                       <label class="form-label">First Name</label>
-                      <input type="text" class="form-control" name="firstName">
+                      <!-- ĐÃ XÓA required -->
+                      <input type="text" class="form-control" name="firstName" th:field="*{firstName}">
                     </div>
                     <div class="col-md-6">
                       <label class="form-label">Last Name</label>
-                      <input type="text" class="form-control" name="lastName">
+                      <!-- ĐÃ XÓA required -->
+                      <input type="text" class="form-control" name="lastName" th:field="*{lastName}">
                     </div>
                   </div>
                   <div class="mb-3">
                     <label class="form-label">Email</label>
-                    <input type="email" class="form-control" name="email">
+                    <!-- ĐÃ XÓA required -->
+                    <input type="email" class="form-control" name="email" th:field="*{email}">
                   </div>
                   <div class="mb-3">
                     <label class="form-label">Roles</label>
@@ -156,7 +168,7 @@
                   </div>
                   <div class="mb-3">
                     <label class="form-label">Email</label>
-                    <input type="email" class="form-control" id="editEmail" name="email">
+                    <input type="text" class="form-control" id="editEmail" name="email">
                   </div>
                   <div class="mb-3">
                     <label class="form-label">Bio</label>
@@ -253,7 +265,15 @@
         rolesContainer.innerHTML = '';
         
         roles.forEach(role => {
-          const isChecked = user.roles.includes(role.name);
+          let isChecked = false;
+          // Logic kiểm tra role an toàn (hỗ trợ cả mảng chuỗi hoặc mảng object)
+          if (user.roles && user.roles.length > 0) {
+             if (typeof user.roles[0] === 'string') {
+                 isChecked = user.roles.includes(role.name);
+             } else {
+                 isChecked = user.roles.some(r => r.name === role.name);
+             }
+          }
           
           const div = document.createElement('div');
           div.className = 'form-check';
@@ -281,13 +301,13 @@
       document.getElementById('editUserFormView').style.display = 'none';
     }
     
-function confirmDelete(userId) {
-  const deleteForm = document.getElementById('deleteForm');
-  deleteForm.action = `/admin/users/delete/${userId}`;
-  
-  const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-  deleteModal.show();
-}
+    function confirmDelete(userId) {
+      const deleteForm = document.getElementById('deleteForm');
+      deleteForm.action = `/admin/users/delete/${userId}`;
+      
+      const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+      deleteModal.show();
+    }
 
   </script>
 </body>

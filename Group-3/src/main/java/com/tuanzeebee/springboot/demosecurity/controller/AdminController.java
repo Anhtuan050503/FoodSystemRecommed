@@ -1,5 +1,6 @@
 package com.tuanzeebee.springboot.demosecurity.controller;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -7,12 +8,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,13 +47,16 @@ public class AdminController {
     private final IngredientService ingredientService;
     private final RecipeService recipeService;
     private final PostService postService;
-    
+
+    // Regex kiểm tra email
+    private static final String EMAIL_REGEX = "^[A-Za-z0-9+_.-]+@(.+)$";
+
     @Autowired
     public AdminController(UserService userService, 
-                          RoleRepository roleRepository, 
-                          IngredientService ingredientService,
-                          RecipeService recipeService,
-                          PostService postService) {
+                           RoleRepository roleRepository, 
+                           IngredientService ingredientService,
+                           RecipeService recipeService,
+                           PostService postService) {
         this.userService = userService;
         this.roleRepository = roleRepository;
         this.ingredientService = ingredientService;
@@ -58,18 +66,15 @@ public class AdminController {
     
     @GetMapping({"", "/", "/dashboard"})
     public String dashboard(Model model, Authentication authentication) {
-        // Tổng số lượng
         long totalUsers = userService.countUsers();
         long totalRecipes = recipeService.countRecipes();
         long totalIngredients = ingredientService.countIngredients();
         long totalComments = postService.countPosts();
 
-        // Lấy thông tin user đang đăng nhập
         String username = authentication.getName();
         User currentUser = userService.findByUsername(username);
         model.addAttribute("user", currentUser);
 
-        // Thêm dữ liệu vào model
         model.addAttribute("totalUsers", totalUsers);
         model.addAttribute("totalRecipes", totalRecipes);
         model.addAttribute("totalIngredients", totalIngredients);
@@ -86,8 +91,30 @@ public class AdminController {
         return "admin/users";
     }
     
+    // --- PHƯƠNG THỨC ADD USER ĐÃ CẬP NHẬT ---
     @PostMapping("/users/add")
-    public String addUser(@ModelAttribute User user, @RequestParam List<Long> roleIds, RedirectAttributes redirectAttributes) {
+    public String addUser(@Valid @ModelAttribute("newUser") User user, 
+                          BindingResult result,
+                          // Role không bắt buộc (required=false) để ta tự kiểm tra
+                          @RequestParam(value = "roleIds", required = false) List<Long> roleIds, 
+                          RedirectAttributes redirectAttributes) {
+        
+        // 1. Kiểm tra Validation:
+        // - Nếu có lỗi @NotBlank (trường trống)
+        // - HOẶC nếu không chọn Role nào (roleIds bị null hoặc rỗng)
+        if (result.hasErrors() || roleIds == null || roleIds.isEmpty()) {
+            redirectAttributes.addFlashAttribute("message", 
+                Map.of("type", "alert-danger", "content", "Please fill in all fields"));
+            return "redirect:/admin/users";
+        }
+
+        // 2. Kiểm tra định dạng Email thủ công
+        if (!isValidEmail(user.getEmail())) {
+            redirectAttributes.addFlashAttribute("message", 
+                Map.of("type", "alert-danger", "content", "Invalid email"));
+            return "redirect:/admin/users";
+        }
+
         try {
             Set<Role> roles = roleIds.stream()
                     .map(roleId -> roleRepository.findById(roleId).orElseThrow())
@@ -97,29 +124,108 @@ public class AdminController {
             redirectAttributes.addFlashAttribute("message", 
                 Map.of("type", "alert-success", "content", "Thêm người dùng thành công!"));
         } catch (RuntimeException e) {
-            redirectAttributes.addFlashAttribute("message", 
-                Map.of("type", "alert-danger", "content", e.getMessage()));
+            // Xử lý lỗi trùng username hoặc lỗi khác từ Service
+            String errorMsg = e.getMessage();
+            if (errorMsg != null && errorMsg.contains("Username already exists")) {
+                 redirectAttributes.addFlashAttribute("message", 
+                    Map.of("type", "alert-danger", "content", "Username already exists"));
+            } else {
+                 redirectAttributes.addFlashAttribute("message", 
+                    Map.of("type", "alert-danger", "content", errorMsg != null ? errorMsg : "Error creating user"));
+            }
         }
         return "redirect:/admin/users";
     }
     
-    @PostMapping("/users/update/{id}")
-    public String updateUser(@PathVariable Long id, @ModelAttribute User user, @RequestParam List<Long> roleIds, RedirectAttributes redirectAttributes) {
+    // Hàm phụ trợ kiểm tra email
+    private boolean isValidEmail(String email) {
+        return email != null && Pattern.compile(EMAIL_REGEX).matcher(email).matches();
+    }
+
+    // ... Các phương thức khác (Update, Delete, Recipe, Ingredient...) giữ nguyên
+    
+     @PostMapping("/users/update/{id}")
+    public String updateUser(@PathVariable Long id, 
+                             @ModelAttribute User user, 
+                             @RequestParam List<Long> roleIds, 
+                             @RequestParam(value = "avatarFile", required = false) MultipartFile avatarFile,
+                             RedirectAttributes redirectAttributes) {
         try {
+            // 1. Validation: Kiểm tra các trường bắt buộc bị bỏ trống
+            if (user.getFirstName() == null || user.getFirstName().trim().isEmpty() ||
+                user.getLastName() == null || user.getLastName().trim().isEmpty() ||
+                user.getEmail() == null || user.getEmail().trim().isEmpty()) {
+                
+                redirectAttributes.addFlashAttribute("message", 
+                    Map.of("type", "alert-danger", "content", "Please fill out all field"));
+                return "redirect:/admin/users";
+            }
+
+           if (!isValidEmail(user.getEmail())) {
+                redirectAttributes.addFlashAttribute("message", 
+                    Map.of("type", "alert-danger", "content", "Invalid email"));
+                return "redirect:/admin/users";
+            }
+
+            
+            // Kiểm tra User có tồn tại không
+            User existingUser = userService.findById(id);
+            if (existingUser == null) {
+                throw new RuntimeException("User not found");
+            }
+
             Set<Role> roles = roleIds.stream()
                     .map(roleId -> roleRepository.findById(roleId).orElseThrow())
                     .collect(Collectors.toSet());
             user.setRoles(roles);
+
+            // 3. Xử lý Avatar (Không check size/type, chỉ lưu nếu có file)
+            if (avatarFile != null && !avatarFile.isEmpty()) {
+                String avatarPath = saveAvatar(avatarFile);
+                user.setAvatar(avatarPath);
+            } else {
+                user.setAvatar(existingUser.getAvatar());
+            }
+
+            // Giữ lại password cũ
+            user.setPassword(existingUser.getPassword());
+
+            // Cập nhật User
             userService.updateUser(id, user);
+            
+            // 4. Thành công
             redirectAttributes.addFlashAttribute("message", 
-                Map.of("type", "alert-success", "content", "Cập nhật người dùng thành công!"));
-        } catch (RuntimeException e) {
-            redirectAttributes.addFlashAttribute("message", 
-                Map.of("type", "alert-danger", "content", e.getMessage()));
+                Map.of("type", "alert-success", "content", "User update successfully"));
+
+        } catch (RuntimeException | IOException e) {
+            // Xử lý lỗi trùng email hoặc lỗi khác
+            String errorMsg = e.getMessage();
+            if (errorMsg != null && (errorMsg.contains("Duplicate entry") || errorMsg.contains("Email already exists"))) {
+                redirectAttributes.addFlashAttribute("message", 
+                    Map.of("type", "alert-danger", "content", "Email already exists"));
+            } else {
+                redirectAttributes.addFlashAttribute("message", 
+                    Map.of("type", "alert-danger", "content", errorMsg != null ? errorMsg : "Error updating user"));
+            }
         }
         return "redirect:/admin/users";
     }
-    
+     private String saveAvatar(MultipartFile file) throws java.io.IOException {
+        String uploadDir = "src/main/resources/static/uploads/avatars";
+        Path uploadPath = Paths.get(uploadDir);
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectories(uploadPath);
+        }
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = "";
+        if(originalFilename != null && originalFilename.contains(".")) {
+             fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+        String fileName = System.currentTimeMillis() + "_" + UUID.randomUUID().toString() + fileExtension;
+        Path filePath = uploadPath.resolve(fileName);
+        Files.copy(file.getInputStream(), filePath);
+        return "/uploads/avatars/" + fileName;
+    }
     @PostMapping("/users/delete/{id}")
     public String deleteUser(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {
@@ -132,7 +238,7 @@ public class AdminController {
         }
         return "redirect:/admin/users";
     }
-    
+
     @GetMapping("/ingredients")
     public String showIngredientsPage(Model model) {
         model.addAttribute("ingredients", ingredientService.getAllIngredients());
@@ -177,11 +283,11 @@ public class AdminController {
         }
         return "redirect:/admin/ingredients";
     }
+
     @GetMapping("/recipes")
     public String showRecipesPage(Model model) {
         List<RecipeDTO> recipes = recipeService.getAllRecipes();
         
-        // Đảm bảo mỗi recipe đều có danh sách ingredient với id
         recipes.forEach(recipe -> {
             if (recipe.getIngredients() == null) {
                 recipe.setIngredients(new HashSet<>());
@@ -192,6 +298,7 @@ public class AdminController {
         model.addAttribute("ingredients", ingredientService.getAllIngredients());
         return "admin/recipes";
     }
+
     @PostMapping("/recipes/add")
     public String addRecipe(@RequestParam("name") String name,
                            @RequestParam("description") String description,
@@ -203,13 +310,11 @@ public class AdminController {
             recipeDTO.setName(name);
             recipeDTO.setDescription(description);
             
-            // Xử lý file ảnh
             if (!imageFile.isEmpty()) {
                 String imagePath = saveImage(imageFile);
                 recipeDTO.setImage(imagePath);
             }
             
-            // Xử lý ingredients
             if (ingredientIds != null && !ingredientIds.isEmpty()) {
                 Set<IngredientDTO> ingredients = ingredientIds.stream()
                         .map(id -> {
@@ -246,7 +351,6 @@ public class AdminController {
             recipeDTO.setName(name);
             recipeDTO.setDescription(description);
             
-            // Xử lý file ảnh
             if (!imageFile.isEmpty()) {
                 String imagePath = saveImage(imageFile);
                 recipeDTO.setImage(imagePath);
@@ -254,7 +358,6 @@ public class AdminController {
                 recipeDTO.setImage(currentImage);
             }
             
-            // Xử lý ingredients
             if (ingredientIds != null && !ingredientIds.isEmpty()) {
                 Set<IngredientDTO> ingredients = ingredientIds.stream()
                         .map(ingredientId -> {
@@ -277,6 +380,7 @@ public class AdminController {
         }
         return "redirect:/admin/recipes";
     }
+
     @GetMapping("/recipes/delete/{id}")
     public String deleteRecipe(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {
@@ -292,23 +396,19 @@ public class AdminController {
     }
     
     private String saveImage(MultipartFile file) throws java.io.IOException {
-        // Tạo thư mục uploads nếu chưa tồn tại
         String uploadDir = "src/main/resources/static/uploads/recipes";
         Path uploadPath = Paths.get(uploadDir);
         if (!Files.exists(uploadPath)) {
             Files.createDirectories(uploadPath);
         }
         
-        // Tạo tên file duy nhất với timestamp
         String originalFilename = file.getOriginalFilename();
         String fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
         String fileName = System.currentTimeMillis() + "_" + java.util.UUID.randomUUID().toString() + fileExtension;
         
-        // Lưu file
         Path filePath = uploadPath.resolve(fileName);
         Files.copy(file.getInputStream(), filePath);
         
-        // Trả về URL đầy đủ để hiển thị
         return "/uploads/recipes/" + fileName;
     }
 }
