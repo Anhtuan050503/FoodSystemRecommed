@@ -246,11 +246,20 @@ public class AdminController {
     }
     
     @PostMapping("/ingredients/add")
-    public String addIngredient(Ingredient ingredient, Model model, RedirectAttributes redirectAttributes) {
+    public String addIngredient(@Valid @ModelAttribute Ingredient ingredient, 
+                                BindingResult result, 
+                                Model model, 
+                                RedirectAttributes redirectAttributes) {
+        // Kiểm tra lỗi validation (ví dụ: @NotBlank trong Entity Ingredient)
+        if (result.hasErrors()) {
+            // Nếu có lỗi, thêm thông báo lỗi vào Flash Attributes
+            return "redirect:/admin/ingredients";
+        }
+
         try {
             ingredientService.createIngredient(ingredient);
             redirectAttributes.addFlashAttribute("message", 
-                Map.of("type", "alert-success", "content", "Thêm nguyên liệu thành công!"));
+                Map.of("type", "alert-success", "content", "Ingredient added successfully!!"));
         } catch (RuntimeException e) {
             redirectAttributes.addFlashAttribute("message", 
                 Map.of("type", "alert-danger", "content", e.getMessage()));
@@ -263,7 +272,7 @@ public class AdminController {
         try {
             ingredientService.updateIngredient(ingredient.getId(), ingredient);
             redirectAttributes.addFlashAttribute("message", 
-                Map.of("type", "alert-success", "content", "Cập nhật nguyên liệu thành công!"));
+                Map.of("type", "alert-success", "content", "Ingredient updated successfully!"));
         } catch (RuntimeException e) {
             redirectAttributes.addFlashAttribute("message", 
                 Map.of("type", "alert-danger", "content", e.getMessage()));

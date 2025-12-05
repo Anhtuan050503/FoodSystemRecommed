@@ -121,7 +121,11 @@
           <div class="modal-body">
             <div class="mb-3">
               <label for="name" class="form-label">Name</label>
-              <input type="text" class="form-control" id="name" name="name" required>
+              <input type="text" class="form-control" id="name" name="name">
+            </div>
+            <!-- Alert lỗi tự tạo -->
+            <div id="add-error" class="alert alert-danger mt-2 d-none">
+    Please fill out this field.
             </div>
             <div class="mb-3">
               <label for="icon" class="form-label">Select Icon</label>
@@ -177,8 +181,11 @@
             <input type="hidden" id="edit-id" name="id">
             <div class="mb-3">
               <label for="edit-name" class="form-label">Name</label>
-              <input type="text" class="form-control" id="edit-name" name="name" required>
+              <input type="text" class="form-control" id="edit-name" name="name">
             </div>
+            <div id="edit-error" class="alert alert-danger mt-2 d-none">
+    Please fill out this field.
+</div>
             <div class="mb-3">
               <label for="edit-icon" class="form-label">Select Icon</label>
               <div class="input-group">
@@ -285,5 +292,62 @@
       });
     });
   </script>
+  <script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Form Add Ingredient
+    const addForm = document.querySelector("#addIngredientModal form");
+    const addNameInput = document.getElementById("name");
+    const addError = document.getElementById("add-error");
+
+    addForm.addEventListener("submit", function(e) {
+        // Check empty
+        if (addNameInput.value.trim() === "") {
+            e.preventDefault(); // Stop submit
+            addError.classList.remove("d-none"); // Show alert
+            addError.innerText = "Please fill out this field.";
+            return false;
+        }
+        addError.classList.add("d-none");
+    });
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    /* ===========================
+       ADD INGREDIENT VALIDATION
+    ============================ */
+    const addForm = document.querySelector("#addIngredientModal form");
+    const addNameInput = document.getElementById("name");
+    const addError = document.getElementById("add-error");
+
+    addForm.addEventListener("submit", function(e) {
+        if (addNameInput.value.trim() === "") {
+            e.preventDefault();
+            addError.classList.remove("d-none");
+            addError.innerText = "Please fill out this field.";
+            return false;
+        }
+        addError.classList.add("d-none");
+    });
+
+    /* ===========================
+       EDIT INGREDIENT VALIDATION
+    ============================ */
+    const editForm = document.querySelector("#editIngredientModal form");
+    const editNameInput = document.getElementById("edit-name");
+    const editError = document.getElementById("edit-error");
+
+    editForm.addEventListener("submit", function(e) {
+        if (editNameInput.value.trim() === "") {
+            e.preventDefault();
+            editError.classList.remove("d-none");
+            editError.innerText = "Please fill out this field.";
+            return false;
+        }
+        editError.classList.add("d-none");
+    });
+});
+</script>
+
 </body>
 </html>

@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-DemosecurityApplication<demosecurity>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.tuanzeebee.springboot.demosecurity.DemosecurityApplication",
+            "projectName": "demosecurity",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
